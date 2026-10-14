@@ -2,9 +2,7 @@ import os
 import io
 import streamlit as st
 from PIL import Image
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
 
@@ -43,20 +41,13 @@ st.markdown("""
 
 @st.cache_resource
 def get_drive_service():
-    creds = None
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            if not os.path.exists('credentials.json'):
-                return None
-            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-            creds = flow.run_local_server(port=0)
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
-    return build('drive', 'v3', credentials=creds)
+    try:
+        creds_info = dict(st.secrets["gcp_service_account"])
+        creds = service_account.Credentials.from_service_account_info(creds_info, scopes=SCOPES)
+        return build('drive', 'v3', credentials=creds)
+    except Exception as e:
+        st.error(f"Google Drive ချိတ်ဆက်ရန် Secrets ပြင်ဆင်ရန် လိုအပ်ပါသည်။ Error: {e}")
+        return None
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def download_image(file_id):
@@ -178,7 +169,7 @@ if 'last_order_info' not in st.session_state:
 
 service = get_drive_service()
 if not service:
-    st.error("Google Drive API ချိတ်ဆက်ရန် credentials.json ဖိုင် လိုအပ်ပါသည်။")
+    st.error("Google Drive API ချိတ်ဆက်ရန် Streamlit Secrets ကို အမှန်တကယ် ဖြည့်သွင်းထားခြင်း ရှိမရှိ စစ်ဆေးပါ။")
 else:
     front_designs = load_folder_items("Tee Design")
     back_designs = load_folder_items("Tee Design Back")
